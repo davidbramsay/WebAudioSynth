@@ -1,0 +1,42 @@
+extends layout
+
+block content
+	h1= title
+	p Welcome to #{title}
+		div(id="synth")
+			div(id="effects")
+				div(class="effect", id='attack')
+					p Attack
+					input(class="knob", id='a', data-width="75", data-height="75", data-displayPrevious=true, data-fgColor="#172457", data-skin="tron", data-cursor=true, value="50", data-thickness=".2")
+					div(class='toggle', id='at') lin
+
+				div(class='effect', id='decay')
+					p Decay
+					input(class="knob", id='d', data-width="75", data-height="75", data-displayPrevious=true, data-fgColor="#172457", data-skin="tron", data-cursor=true, value="50", data-thickness=".2")
+					div(class='toggle', id='dt') lin
+
+				div(class='effect', id='portamento')
+					p Portamento
+					input(class="knob", id='p' data-width="75", data-height="75", data-displayPrevious=true, data-fgColor="#172457", data-skin="tron", data-cursor=true, value="50", data-thickness=".2")
+					div(class='toggle', id='pt') lin
+				
+				div(id='effectbottom')
+					span Oscillator Type:
+					div(class='toggle', id='signalType') sine
+					span Note Assignment:
+					div(class='toggle', id='noteBehavior') note1
+
+				div(id='outputbar')
+					div(id='outputSelect') Selected channel(s):
+					div(id='outputNotes') MIDI notes playing:
+
+			div(id="selector")
+				div(class='selectable', id='s1') 
+					span(class="label") #1
+					input(class="spinner", name="value")
+					div(class="sliderBox")
+						input(type="range", min="0", max="100", data-rangeslider)
+				
+				div(id="modSelector")
+					div(class='toggle' id='add') Add
+					div(class='toggle' id='del') Del
