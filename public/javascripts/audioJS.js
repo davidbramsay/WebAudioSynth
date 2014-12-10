@@ -9,7 +9,7 @@
 //var context = new webkitAudioContext();
 
 toggleOptions = ["log","lin"];
-noteAssignmentOptions = ["low", "2low", "3low", "high","2hgh","3hgh","1st","2nd","3rd","4th","rand","rndA"];
+noteAssignmentOptions = ["low", "2low", "3low", "high","2hgh","3hgh","1st","2nd","3rd","4th","rand"];
 oscTypeOptions = ["sin","sqr","saw","tri"];
 
 screenToggleState = {
@@ -147,9 +147,25 @@ oscArrayUpdateFreqScale = function(identity, freqScale){
 
 oscArrayUpdateEffectValue = function(effect, value){
 //step through all elements, if selected update value
-	for (index in oscArray){
-		if (oscArray[index].select){
-			oscArray[index].effectSettings[effect] = value;
+	for (ind in oscArray){
+		if (oscArray[ind].select){
+			oscArray[ind].effectSettings[effect] = value;
+
+			if (effect == "oscType"){
+				switch(value){
+					case 1:
+						oscArray[ind].oscillator.type = 'square'; console.log('sq');
+						break;
+					case 2:
+						oscArray[ind].oscillator.type = 'sawtooth'; console.log('st');
+						break;
+					case 3:
+						oscArray[ind].oscillator.type = 'triangle'; console.log('tri');
+						break;
+					default:
+						oscArray[ind].oscillator.type = 'sine'; console.log('sin');
+				};
+			}
 		}
 	}
 }
@@ -355,10 +371,10 @@ initializeKnobs = function(){
                 console.log(event.target.id + ' ' + this.cv);
 
                 if ($(event.target).parents(".effect").attr("id") == 'attack'){
-                	oscArrayUpdateEffectValue("attack", this.cv/100);
+                	oscArrayUpdateEffectValue("attack", this.cv/50);
 
                 } else if ($(event.target).parents(".effect").attr("id") == 'decay'){
-                	oscArrayUpdateEffectValue("decay", this.cv/100);
+                	oscArrayUpdateEffectValue("decay", this.cv/50);
                 	
                 } else if ($(event.target).parents(".effect").attr("id") == 'portamento'){
                 	oscArrayUpdateEffectValue("portamento", this.cv/100);
@@ -496,6 +512,7 @@ $(function($) {
 
 	//write spinner value for first div
 	$( ".spinner" ).spinner().val(1);
+	$(".knob").val(5).trigger("change");
 	SelectFirstOsc();
 
 
@@ -520,9 +537,6 @@ $(function($) {
 //MIDI HANDLING STUFF /////////////////////////////////////////////////////////////////////////
 
 var midiAccess;
-var attack=0.05;			// attack speed
-var release=0.05;		// release speed
-var portamento=0.05;
 var activeNotes = [];
 
 function onMIDIInit(midi) {
@@ -582,41 +596,109 @@ function frequencyFromNoteNumber(note) {
 		}
 
 function noteOn(noteNumber, velocity) {
-			activeNotes.push(noteNumber);
-			
-			for (var i=0; i<oscArray.length; i++){
-				oscArray[i].oscillator.frequency.cancelScheduledValues(0);
-				oscArray[i].oscillator.frequency.setTargetAtTime( oscArray[i].freqScale*frequencyFromNoteNumber(noteNumber), 0, oscArray[i].effectSettings.portamento);
-				oscArray[i].envelope.gain.cancelScheduledValues(0);
-				oscArray[i].envelope.gain.setTargetAtTime(1.0, 0, oscArray[i].effectSettings.attack);
-				oscArray[i].playing = noteNumber;
-			}
+	activeNotes.push(noteNumber);
+	
+	updateOscillatorsFromMidiChange();
+	
+	$( '#outputNotes' ).html('MIDI notes playing: ' + activeNotes.toString());	
+	console.log('active notes:' + activeNotes);
+}
 
-			$( '#outputNotes' ).html('MIDI notes playing: ' + activeNotes.toString());	
-			console.log('active notes:' + activeNotes);
-		}
 
 function noteOff(noteNumber) {
-			var position = activeNotes.indexOf(noteNumber);
-			if (position!=-1) {
-				activeNotes.splice(position,1);
-			}
-			if (activeNotes.length==0) {	// shut off the envelope
-				for (var i=0; i<oscArray.length; i++){
-					oscArray[i].envelope.gain.cancelScheduledValues(0);
-					oscArray[i].envelope.gain.setTargetAtTime(0.0, 0, oscArray[i].effectSettings.decay );
-					oscArray[i].playing = 0;
-				}
-			} else {
-				for (var i=0; i<oscArray.length; i++){
-					oscArray[i].oscillator.frequency.cancelScheduledValues(0);
-					oscArray[i].oscillator.frequency.setTargetAtTime( oscArray[i].freqScale*frequencyFromNoteNumber(activeNotes[activeNotes.length-1]), 0, oscArray[i].effectSettings.portamento);
-					oscArray[i].playing = activeNotes[activeNotes.length-1];
-				}
+	var position = activeNotes.indexOf(noteNumber);
+	if (position!=-1) { activeNotes.splice(position,1); }
+	
+	updateOscillatorsFromMidiChange();
+
+	$( '#outputNotes' ).html('MIDI notes playing: ' + activeNotes.toString());
+	console.log('active notes:' + activeNotes);
+}
+
+
+function getNoteNumber(noteAssignment){
+	//return noteNumber from activeNotes array that you should play based on your noteAssignment
+	//noteAssignmentOptions = ["low", "2low", "3low", "high","2hgh","3hgh","1st","2nd","3rd","4th","rand","rndA"];
+	var sortedNotes = activeNotes.slice(0);
+	sortedNotes.sort(function(a, b) {return a - b;});
+
+	switch(noteAssignment){
+		case 0: //lowest note
+			return (typeof(sortedNotes[0]) !== 'undefined') ? sortedNotes[0] : 0;
+		case 1: //2nd lowest note
+			return (typeof(sortedNotes[1]) !== 'undefined') ? sortedNotes[1] : 0;
+		case 2: //3rd lowest note
+			return (typeof(sortedNotes[2]) !== 'undefined') ? sortedNotes[2] : 0;
+		case 3: //highest note
+			return (typeof(sortedNotes[sortedNotes.length-1]) !== 'undefined') ? sortedNotes[sortedNotes.length-1] : 0;
+		case 4: //2nd highest note
+			return (typeof(sortedNotes[sortedNotes.length-2]) !== 'undefined') ? sortedNotes[sortedNotes.length-2] : 0;
+		case 5: //3rd highest note
+			return (typeof(sortedNotes[sortedNotes.length-3]) !== 'undefined') ? sortedNotes[sortedNotes.length-3] : 0;
+		case 6: //first chronological note played
+			return (typeof(activeNotes[0]) !== 'undefined') ? activeNotes[0] : 0;
+		case 7: //second chronological note played
+			return (typeof(activeNotes[1]) !== 'undefined') ? activeNotes[1] : 0;
+		case 8: //third chronological note played
+			return (typeof(activeNotes[2]) !== 'undefined') ? activeNotes[2] : 0;
+		case 9: //fourth chronological note played
+			return (typeof(activeNotes[3]) !== 'undefined') ? activeNotes[3] : 0;
+		case 10: //random note from activeNotes
+			var randIndex = Math.round((Math.random()*activeNotes.length)-0.5);
+			return (typeof(activeNotes[randIndex]) !== 'undefined') ? activeNotes[randIndex] : 0;
+		default:
+			console.log('error in getNoteNumber');
+	};
+
+}
+
+function updateOscillatorsFromMidiChange(){
+	for (ind in oscArray){
+		//get note to play
+		var noteNumber = getNoteNumber(oscArray[ind].effectSettings['noteAssignment']);
+		
+		//compare to playing note and update oscillator frequency
+		if (oscArray[ind].playing != noteNumber && noteNumber){
+			var now = context.currentTime;
+			oscArray[ind].oscillator.frequency.cancelScheduledValues(now);
+			oscArray[ind].oscillator.frequency.setValueAtTime(oscArray[ind].oscillator.frequency.value,now);
+
+			if (oscArray[ind].effectSettings['portamentoType']){
+				oscArray[ind].oscillator.frequency.linearRampToValueAtTime(oscArray[ind].freqScale*frequencyFromNoteNumber(noteNumber), now + oscArray[ind].effectSettings.portamento);
+			}else{
+				oscArray[ind].oscillator.frequency.exponentialRampToValueAtTime(oscArray[ind].freqScale*frequencyFromNoteNumber(noteNumber), now + oscArray[ind].effectSettings.portamento);
 			}
 
-			$( '#outputNotes' ).html('MIDI notes playing: ' + activeNotes.toString());
-			console.log('active notes:' + activeNotes);
 		}
+
+		//compare note on/off and update envelope
+		if (!oscArray[ind].playing && noteNumber){ //was off, now on
+			var now = context.currentTime;
+			oscArray[ind].envelope.gain.cancelScheduledValues(now);
+			oscArray[ind].envelope.gain.setValueAtTime(oscArray[ind].envelope.gain.value, now);
+
+			if (oscArray[ind].effectSettings['attackType']){
+				oscArray[ind].envelope.gain.linearRampToValueAtTime(1.0, now + oscArray[ind].effectSettings.attack);
+			}else{
+				oscArray[ind].envelope.gain.exponentialRampToValueAtTime(1.0, now + oscArray[ind].effectSettings.attack);
+			}
+		}
+
+		if (oscArray[ind].playing && !noteNumber){ //was on, now off
+			var now = context.currentTime;
+			oscArray[ind].envelope.gain.cancelScheduledValues(now);
+			oscArray[ind].envelope.gain.setValueAtTime(oscArray[ind].envelope.gain.value, now);
+
+			if (oscArray[ind].effectSettings['decayType']){
+				oscArray[ind].envelope.gain.linearRampToValueAtTime(0.0, now + oscArray[ind].effectSettings.decay);
+			}else{
+				oscArray[ind].envelope.gain.exponentialRampToValueAtTime(0.00001, now + oscArray[ind].effectSettings.decay);
+			}
+		}
+
+		//update playing field
+		oscArray[ind].playing = noteNumber;
+	}
+}
 
 
