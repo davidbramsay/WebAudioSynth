@@ -12,6 +12,14 @@ toggleOptions = ["log","lin"];
 noteAssignmentOptions = ["low", "2low", "3low", "high","2hgh","3hgh","1st","2nd","3rd","4th","rand","rndA"];
 oscTypeOptions = ["sin","sqr","saw","tri"];
 
+screenToggleState = {
+	attackType: 1,
+	decayType: 1,
+	portamentoType: 1,
+	oscType: 0,
+	noteAssignment: 0
+};
+
 function oscObject () {
 
 	this.effectSettings = {
@@ -21,8 +29,8 @@ function oscObject () {
 		decayType: 1,
 		portamento: 0.05,
 		portamentoType: 1,
-		oscType: 1,
-		noteAssignment: 1
+		oscType: 0,
+		noteAssignment: 0
 	},
 	this.select = false,
 	this.playing = 0,
@@ -136,8 +144,49 @@ oscArrayUpdateFreqScale = function(identity, freqScale){
 	}
 }
 
-// KNOB STUFF ///////////////////////////////////////////////////////////////////////
 
+oscArrayUpdateEffectValue = function(effect, value){
+//step through all elements, if selected update value
+	for (index in oscArray){
+		if (oscArray[index].select){
+			oscArray[index].effectSettings[effect] = value;
+		}
+	}
+}
+
+
+updateEffectsView = function(selection){
+	//get index of oscArray to pull update values from
+	var index = oscArray.map(function(e) { return e.identity; }).indexOf(parseInt(selection.substring(1)));
+
+	//update values to screen for knobs and toggles from oscArray[index].effectSettings
+
+	//KNOBS
+	//print to screen
+	$(".knob#a").val(oscArray[index].effectSettings['attack']*100).trigger("change");
+	$(".knob#d").val(oscArray[index].effectSettings['decay']*100).trigger("change");
+	$(".knob#p").val(oscArray[index].effectSettings['portamento']*100).trigger("change");
+
+
+	//TOGGLES
+	//write to array
+	screenToggleState.attackType=oscArray[index].effectSettings['attackType'];
+	screenToggleState.decayType=oscArray[index].effectSettings['decayType'];
+	screenToggleState.portamentoType=oscArray[index].effectSettings['portamentoType'];
+	screenToggleState.oscType=oscArray[index].effectSettings['oscType'];
+	screenToggleState.noteAssignment=oscArray[index].effectSettings['noteAssignment'];
+
+	//print array to screen
+	$('#at').html(toggleOptions[screenToggleState.attackType]);
+	$('#dt').html(toggleOptions[screenToggleState.decayType]);
+	$('#pt').html(toggleOptions[screenToggleState.portamentoType]);
+	$('#signalType').html(oscTypeOptions[screenToggleState.oscType]);
+	$('#noteBehavior').html(noteAssignmentOptions[screenToggleState.noteAssignment]);
+}
+
+
+
+// KNOB STUFF ///////////////////////////////////////////////////////////////////////
 
 //LOG KNOB, 0-1
 // value from actual knob, k: range 0 to <max_knob>
@@ -179,9 +228,27 @@ delSelected = function(){
 	//remove div
 	console.log("delete " + $(".ui-selected").parent().attr("id"));	      
 	$(".ui-selected").parent().remove();	
+
+	SelectFirstOsc();
 }
 
+SelectFirstOsc = function(){
+	var selectedRows=[];
+	var element = $("#s" + oscArray[0]["identity"] + " .label");
 
+    element.addClass("ui-selected");
+    element.parent().css("background-color","#FFE1AD");		
+   	selectedRows.push(element.html());
+
+	//write selected to screen
+	$( '#outputSelect' ).html('Selected channel(s): ' + selectedRows.toString());
+	
+	//write selected to oscArray
+	updateSelection(selectedRows);
+
+	console.log("DISABLED"); //disable selectable feature so things don't go crazy if you use sliders
+	$( "#selector" ).selectable( "option", "disabled", "true" );
+}
 
 initializeSliders = function(){
 
@@ -254,6 +321,9 @@ intitializeSelectable = function(){
 			//write selected to oscArray
 			updateSelection(selectedRows);
 
+			//update knobs
+			updateEffectsView(selectedRows[0]);
+
 			console.log("DISABLED"); //disable selectable feature so things don't go crazy if you use sliders
 			$( "#selector" ).selectable( "option", "disabled", "true" );	
 		},
@@ -279,16 +349,21 @@ initializeKnobs = function(){
     $(".knob").each(function (e) {
 		$(this).knob({
 
-            release : function (value) {
-                //console.log('value');
-                //oscArray[0].gainNode.gain.value = value/100;
-            },
 
             draw : function () {
                
-                var multiplier = .8;
-                oscArray[0].gainNode.gain.exponentialRampToValueAtTime((Math.exp(multiplier/100*this.cv)-1)/(Math.exp(multiplier)-1)+.001, oscArray[0].context.currentTime, oscArray[0].context.currentTime+100);
                 console.log(event.target.id + ' ' + this.cv);
+
+                if ($(event.target).parents(".effect").attr("id") == 'attack'){
+                	oscArrayUpdateEffectValue("attack", this.cv/100);
+
+                } else if ($(event.target).parents(".effect").attr("id") == 'decay'){
+                	oscArrayUpdateEffectValue("decay", this.cv/100);
+                	
+                } else if ($(event.target).parents(".effect").attr("id") == 'portamento'){
+                	oscArrayUpdateEffectValue("portamento", this.cv/100);
+                	
+                }
 
                 if(this.$.data('skin') == 'tron') {
                     this.cursorExt = 0.3;
@@ -320,7 +395,93 @@ initializeKnobs = function(){
 };
 
 
+incrementScreenToggle = function(effect){
+//update screenToggleState variable and screen, return new val
+	switch(effect){
+		case "attackType":
+			screenToggleState.attackType = 1-screenToggleState.attackType;
+			$('#at').html(toggleOptions[screenToggleState.attackType]);
+			return screenToggleState.attackType;
 
+		case "decayType":
+			screenToggleState.decayType = 1-screenToggleState.decayType;
+			$('#dt').html(toggleOptions[screenToggleState.decayType]);
+			return screenToggleState.decayType;
+
+		case "portamentoType":
+			screenToggleState.portamentoType = 1-screenToggleState.portamentoType;
+			$('#pt').html(toggleOptions[screenToggleState.portamentoType]);
+			return screenToggleState.portamentoType;
+
+		case "oscType":
+			screenToggleState.oscType = (++screenToggleState.oscType == oscTypeOptions.length) ? 0: screenToggleState.oscType;
+			$('#signalType').html(oscTypeOptions[screenToggleState.oscType]);
+			return screenToggleState.oscType;
+
+		case "noteAssignment":
+			screenToggleState.noteAssignment = (++screenToggleState.noteAssignment == noteAssignmentOptions.length) ? 0: screenToggleState.noteAssignment;
+			$('#noteBehavior').html(noteAssignmentOptions[screenToggleState.noteAssignment]);
+			return screenToggleState.noteAssignment;
+
+		default:
+			console.log("error");
+	};
+}
+
+initializeToggles = function(){
+
+	$( ".toggle" ).click(function(){
+		
+		switch($(event.target).attr("id")){
+			case "at":
+        		console.log("attack toggle");
+        		var val = incrementScreenToggle("attackType");
+        		oscArrayUpdateEffectValue("attackType",val);
+
+        		break;
+       		case "dt":
+        		console.log("decay toggle");
+        		var val = incrementScreenToggle("decayType");
+        		oscArrayUpdateEffectValue("decayType",val);
+
+        		break;
+    		case "pt":
+        		console.log("portamento toggle");
+        		var val = incrementScreenToggle("portamentoType");
+        		oscArrayUpdateEffectValue("portamentoType",val);
+
+        		console.log(oscArray);
+
+        		break;
+    		case "signalType":
+        		console.log("signal toggle");
+        		var val = incrementScreenToggle("oscType");
+        		oscArrayUpdateEffectValue("oscType",val);
+
+        		break;
+        	case "noteBehavior":
+        		console.log("note toggle");
+				var val = incrementScreenToggle("noteAssignment");
+        		oscArrayUpdateEffectValue("noteAssignment",val);
+
+        		break;
+			case "add":
+        		console.log("add");
+        		newOsc();
+
+        		break;
+			case "del":
+        		console.log("del");
+        		delSelected();
+
+        		break;
+    		default:
+        		console.log('error');
+		}
+	});
+
+
+}
 
 
 
@@ -331,53 +492,28 @@ $(function($) {
 	initializeSpinners();
 	intitializeSelectable();
 	initializeKnobs();
+	initializeToggles();
 
 	//write spinner value for first div
 	$( ".spinner" ).spinner().val(1);
-
-	$( ".toggle" ).click(function(){
-		
-		switch($(event.target).attr("id")){
-			case "at":
-        		console.log("attack toggle");
-        		break;
-       		case "dt":
-        		console.log("decay toggle");
-        		break;
-    		case "pt":
-        		console.log("portamento toggle");
-        		break;
-    		case "signalType":
-        		console.log("signal toggle");
-        		break;
-        	case "noteBehavior":
-        		console.log("note toggle");
-        		break;
-			case "add":
-        		console.log("add");
-        		newOsc();
-        		break;
-			case "del":
-        		console.log("del");
-        		delSelected();
-        		break;
-    		default:
-        		console.log('error');
-		}
-	}),
+	SelectFirstOsc();
 
 
 
-console.log("MIDI Test Initiated...");
-window.AudioContext=window.AudioContext||window.webkitAudioContext;
-context = new AudioContext();
-if (navigator.requestMIDIAccess)
-	navigator.requestMIDIAccess().then( onMIDIInit, onMIDIReject );
-else
-	alert("No browser MIDI support, please check out http://jazz-soft.net/ and get that browser fixed!")
-	console.log("No browser MIDI support, please check out http://jazz-soft.net/ and get that browser fixed!")
+	console.log("MIDI Test Initiated...");
+	window.AudioContext=window.AudioContext||window.webkitAudioContext;
+	context = new AudioContext();
+	if (navigator.requestMIDIAccess)
+		navigator.requestMIDIAccess().then( onMIDIInit, onMIDIReject );
+	else
+		alert("No browser MIDI support, please check out http://jazz-soft.net/ and get that browser fixed!")
+		console.log("No browser MIDI support, please check out http://jazz-soft.net/ and get that browser fixed!")
 
 });
+
+
+
+
 
 
 
